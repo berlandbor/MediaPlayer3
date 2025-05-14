@@ -14,7 +14,6 @@
       display: flex;
       justify-content: center;
     }
-
     .player-container {
       width: 100%;
       max-width: 900px;
@@ -25,31 +24,16 @@
       padding: 10px;
       box-sizing: border-box;
     }
-
-    #logo {
-      max-width: 100px;
-      height: auto;
-    }
-
-    h1 {
-      font-size: clamp(18px, 5vw, 24px);
-      margin: 0;
-      text-align: center;
-    }
-
-    .badge {
-      font-size: 12px;
-      color: #ccc;
-    }
-
-    video, audio {
+    #logo { max-width: 100px; height: auto; }
+    h1 { font-size: clamp(18px, 5vw, 24px); margin: 0; text-align: center; }
+    .badge { font-size: 12px; color: #ccc; }
+    video {
       width: 100%;
       max-height: 60vh;
       border-radius: 10px;
       background: black;
       outline: none;
     }
-
     .controls, .nav-controls {
       width: 100%;
       display: flex;
@@ -58,7 +42,6 @@
       align-items: center;
       justify-content: center;
     }
-
     button, input[type="range"] {
       background: #333;
       border: none;
@@ -67,33 +50,17 @@
       border-radius: 4px;
       cursor: pointer;
     }
-
-    .time {
-      font-size: 13px;
-      min-width: 42px;
-      text-align: center;
-    }
-
+    .time { font-size: 13px; min-width: 42px; text-align: center; }
     input[type="range"] {
       flex: 1 1 100px;
       height: 6px;
       appearance: none;
     }
-
-    .back-btn {
-      background: #444;
-      align-self: flex-start;
-    }
-
-    .buffering {
-      font-size: 14px;
-      color: #ffaa00;
-    }
-
-    #speed.green  { color: #44ff44; }
+    .back-btn { background: #444; align-self: flex-start; }
+    .buffering { font-size: 14px; color: #ffaa00; }
+    #speed.green { color: #44ff44; }
     #speed.yellow { color: #ffaa00; }
-    #speed.red    { color: #ff5555; }
-
+    #speed.red { color: #ff5555; }
     #speedChart, #audioViz {
       width: 100%;
       max-width: 100%;
@@ -106,7 +73,7 @@
 </head>
 <body>
   <div class="player-container">
-    <button class="back-btn" onclick="location.href='index.html'">🔙Назад к плейлисту</button>
+    <button class="back-btn" onclick="location.href='index.html'">🔙 Назад к плейлисту</button>
     <img id="logo" hidden />
     <h1 id="channelName">Загрузка...</h1>
     <div class="badge" id="qualityBadge"></div>
@@ -145,7 +112,7 @@
     const playlist = JSON.parse(localStorage.getItem("media_autoload") || "[]");
 
     const audioExt = /\.(mp3|aac|ogg|m4a)$/i;
-    const isVideo = !audioExt.test(url);
+    const isAudioOnly = audioExt.test(url);
 
     const buffering = document.getElementById("buffering");
     const statusText = document.getElementById("statusText");
@@ -153,11 +120,16 @@
     const speedCtx = document.getElementById("speedChart").getContext("2d");
     const audioCtxCanvas = document.getElementById("audioViz").getContext("2d");
 
-    const media = document.createElement(isVideo ? "video" : "audio");
+    const media = document.createElement("video");
     media.src = url;
     media.controls = false;
-    media.autoplay = true;
+    media.autoplay = false;
     document.getElementById("media-container").appendChild(media);
+
+    if (isAudioOnly) {
+      media.style.height = "60px";
+      media.style.background = "none";
+    }
 
     document.getElementById("channelName").textContent = name;
     if (logo && logo.startsWith("http")) {
@@ -173,7 +145,21 @@
       : "";
     document.getElementById("qualityBadge").textContent = quality ? `Качество: ${quality}` : "";
 
-    document.getElementById("playPause").onclick = () => {
+    const playPauseBtn = document.getElementById("playPause");
+    const currentTimeEl = document.getElementById("currentTime");
+    const durationEl = document.getElementById("duration");
+    const progressBar = document.getElementById("progress");
+    const volumeBar = document.getElementById("volume");
+
+    let streamTimeout = setTimeout(() => {
+      if (!media.paused && media.readyState < 3) {
+        buffering.style.display = "none";
+        statusText.textContent = "Поток не отвечает (возможно, нерабочий)";
+        statusText.style.color = "#ff4444";
+      }
+    }, 10000);
+
+    playPauseBtn.onclick = () => {
       if (media.paused) {
         media.play();
         playPauseBtn.textContent = "⏸";
@@ -182,12 +168,6 @@
         playPauseBtn.textContent = "▶";
       }
     };
-
-    const playPauseBtn = document.getElementById("playPause");
-    const currentTimeEl = document.getElementById("currentTime");
-    const durationEl = document.getElementById("duration");
-    const progressBar = document.getElementById("progress");
-    const volumeBar = document.getElementById("volume");
 
     media.addEventListener("timeupdate", () => {
       progressBar.value = media.currentTime;
@@ -239,14 +219,6 @@
       statusText.style.color = "#ff4444";
     });
 
-    let streamTimeout = setTimeout(() => {
-      if (!media.paused && !media.ended && media.readyState < 3) {
-        buffering.style.display = "none";
-        statusText.textContent = "Поток не отвечает (возможно, нерабочий)";
-        statusText.style.color = "#ff4444";
-      }
-    }, 10000);
-
     function formatTime(sec) {
       const m = Math.floor(sec / 60);
       const s = Math.floor(sec % 60);
@@ -261,7 +233,7 @@
       location.href = target;
     }
 
-    if (isVideo) {
+    if (!isAudioOnly) {
       let lastLoaded = 0, lastTime = performance.now();
       const history = [], maxPoints = 100;
       setInterval(() => {
@@ -303,6 +275,7 @@
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       let started = false;
+
       function draw() {
         requestAnimationFrame(draw);
         analyser.getByteFrequencyData(dataArray);
@@ -316,10 +289,23 @@
           audioCtxCanvas.fillRect(x, y, barWidth - 2, h);
         });
       }
+
       playPauseBtn.addEventListener("click", () => {
         if (!started) {
-          ctx.resume().then(draw);
+          ctx.resume().then(() => {
+            media.play();
+            playPauseBtn.textContent = "⏸";
+            draw();
+          });
           started = true;
+        } else {
+          if (media.paused) {
+            media.play();
+            playPauseBtn.textContent = "⏸";
+          } else {
+            media.pause();
+            playPauseBtn.textContent = "▶";
+          }
         }
       });
     }
