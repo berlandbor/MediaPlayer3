@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="ru">
+<!DOCTYPE html><html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,7 +13,6 @@
       display: flex;
       justify-content: center;
     }
-
     .player-container {
       width: 100%;
       max-width: 900px;
@@ -25,23 +23,19 @@
       padding: 10px;
       box-sizing: border-box;
     }
-
     #logo {
       max-width: 100px;
       height: auto;
     }
-
     h1 {
       font-size: clamp(18px, 5vw, 24px);
       margin: 0;
       text-align: center;
     }
-
     .badge {
       font-size: 12px;
       color: #ccc;
     }
-
     video, audio {
       width: 100%;
       max-height: 60vh;
@@ -49,8 +43,7 @@
       background: black;
       outline: none;
     }
-
-    .controls {
+    .controls, .nav-controls {
       width: 100%;
       display: flex;
       flex-wrap: wrap;
@@ -58,9 +51,7 @@
       align-items: center;
       justify-content: center;
     }
-
-    .controls button,
-    .controls input[type="range"] {
+    button, input[type="range"] {
       background: #333;
       border: none;
       color: white;
@@ -68,36 +59,29 @@
       border-radius: 4px;
       cursor: pointer;
     }
-
-    .controls .time {
+    .time {
       font-size: 13px;
       min-width: 42px;
       text-align: center;
     }
-
-    .controls input[type="range"] {
+    input[type="range"] {
       flex: 1 1 100px;
       height: 6px;
       appearance: none;
     }
-
     .back-btn {
       background: #444;
       align-self: flex-start;
     }
-
     .buffering {
       font-size: 14px;
       color: #ffaa00;
       display: none;
     }
-
-    #speed.green  { color: #44ff44; }
+    #speed.green { color: #44ff44; }
     #speed.yellow { color: #ffaa00; }
-    #speed.red    { color: #ff5555; }
-
-    #speedChart,
-    #audioViz {
+    #speed.red { color: #ff5555; }
+    #speedChart, #audioViz {
       width: 100%;
       max-width: 100%;
       border-radius: 5px;
@@ -113,10 +97,8 @@
     <img id="logo" hidden />
     <h1 id="channelName">Загрузка...</h1>
     <div class="badge" id="qualityBadge"></div>
-
     <div id="media-container"></div>
     <div class="buffering" id="buffering">Буферизация...</div>
-
     <div class="controls">
       <button id="playPause">▶</button>
       <span class="time" id="currentTime">0:00</span>
@@ -125,19 +107,25 @@
       <input type="range" id="volume" value="1" min="0" max="1" step="0.01">
       <button id="fullscreen">⛶</button>
     </div>
-
+    <div class="nav-controls">
+      <button onclick="changeChannel(-1)">◀ Предыдущий</button>
+      <button onclick="changeChannel(1)">Следующий ▶</button>
+    </div>
     <div id="bufferStatus">
       <div id="speed" class="buffering">Скорость загрузки: —</div>
       <canvas id="speedChart" width="700" height="50"></canvas>
       <canvas id="audioViz" width="700" height="60"></canvas>
     </div>
-  </div>
-
-  <script>
+  </div>  <script>
     const params = new URLSearchParams(location.search);
     const url = params.get("url");
     const name = params.get("name") || "Канал";
     const logo = params.get("logo");
+    const index = parseInt(params.get("index"));
+    const playlist = JSON.parse(localStorage.getItem("media_autoload") || "[]");
+
+    const audioExt = /\.(mp3|aac|ogg|m4a)$/i;
+    const isVideo = !audioExt.test(url);
 
     const mediaContainer = document.getElementById("media-container");
     const playPauseBtn = document.getElementById("playPause");
@@ -151,10 +139,8 @@
     const fullscreenBtn = document.getElementById("fullscreen");
     const qualityBadge = document.getElementById("qualityBadge");
     const speedEl = document.getElementById("speed");
-    const speedChart = document.getElementById("speedChart");
-    const speedCtx = speedChart.getContext("2d");
-    const audioCanvas = document.getElementById("audioViz");
-    const audioCtx = audioCanvas.getContext("2d");
+    const speedCtx = document.getElementById("speedChart").getContext("2d");
+    const audioCtxCanvas = document.getElementById("audioViz").getContext("2d");
 
     nameEl.textContent = name;
     if (logo && logo.startsWith("http")) {
@@ -162,19 +148,13 @@
       logoEl.hidden = false;
     }
 
-    const audioExt = /\.(mp3|aac|ogg|m4a)$/i;
-    const isVideo = !audioExt.test(url);
     const media = document.createElement(isVideo ? "video" : "audio");
     media.src = url;
     media.controls = false;
     media.autoplay = true;
     mediaContainer.appendChild(media);
 
-    const quality = /1080|720|hd/i.test(url)
-      ? "HD"
-      : /480|360|sd/i.test(url)
-      ? "SD"
-      : "";
+    const quality = /1080|720|hd/i.test(url) ? "HD" : /480|360|sd/i.test(url) ? "SD" : "";
     qualityBadge.textContent = quality ? `Качество: ${quality}` : "";
 
     playPauseBtn.onclick = () => {
@@ -221,78 +201,75 @@
       return `${m}:${s.toString().padStart(2, "0")}`;
     }
 
-    // График буферизации
+    function changeChannel(offset) {
+      if (!playlist.length || isNaN(index)) return;
+      let newIndex = (index + offset + playlist.length) % playlist.length;
+      const s = playlist[newIndex];
+      const target = `player.html?name=${encodeURIComponent(s.name)}&url=${encodeURIComponent(s.url)}&logo=${encodeURIComponent(s.logo || '')}&index=${newIndex}`;
+      location.href = target;
+    }
+
     if (isVideo) {
-      let lastLoaded = 0;
-      let lastTime = performance.now();
-      const history = [];
-      const maxPoints = 100;
-
+      let lastLoaded = 0, lastTime = performance.now();
+      const history = [], maxPoints = 100;
       setInterval(() => {
-        const buffered = media.buffered;
-        if (buffered.length === 0) return;
-
-        const end = buffered.end(buffered.length - 1);
+        const buf = media.buffered;
+        if (buf.length === 0) return;
+        const end = buf.end(buf.length - 1);
         const now = performance.now();
+        const delta = (end - lastLoaded);
         const duration = (now - lastTime) / 1000;
-
-        const delta = end - lastLoaded;
         lastLoaded = end;
         lastTime = now;
-
         const bitrate = Math.max(0, Math.round((delta * media.videoWidth * media.videoHeight * 0.07) / duration));
         history.push(bitrate);
         if (history.length > maxPoints) history.shift();
-
         speedEl.textContent = `Скорость загрузки: ${bitrate} кбит/с`;
         speedEl.className = "buffering";
         if (bitrate > 1500) speedEl.classList.add("green");
         else if (bitrate > 800) speedEl.classList.add("yellow");
         else speedEl.classList.add("red");
-
         speedCtx.clearRect(0, 0, speedChart.width, speedChart.height);
         speedCtx.beginPath();
-        speedCtx.moveTo(0, speedChart.height);
         history.forEach((v, i) => {
           const x = (i / maxPoints) * speedChart.width;
           const y = speedChart.height - (v / 3000) * speedChart.height;
-          speedCtx.lineTo(x, y);
+          if (i === 0) speedCtx.moveTo(x, y);
+          else speedCtx.lineTo(x, y);
         });
         speedCtx.strokeStyle = "#00ffff";
         speedCtx.lineWidth = 2;
         speedCtx.stroke();
       }, 2000);
-    }
-
-    // Визуализация аудио
-    if (!isVideo) {
+    } else {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const source = ctx.createMediaElementSource(media);
       const analyser = ctx.createAnalyser();
       source.connect(analyser);
       analyser.connect(ctx.destination);
-
       analyser.fftSize = 64;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
-
+      let audioCtxStarted = false;
       function draw() {
         requestAnimationFrame(draw);
         analyser.getByteFrequencyData(dataArray);
-
-        audioCtx.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
+        audioCtxCanvas.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
         const barWidth = audioCanvas.width / bufferLength;
         dataArray.forEach((v, i) => {
-          const barHeight = (v / 255) * audioCanvas.height;
+          const h = (v / 255) * audioCanvas.height;
           const x = i * barWidth;
-          const y = audioCanvas.height - barHeight;
-          audioCtx.fillStyle = `hsl(${i * 12}, 100%, 50%)`;
-          audioCtx.fillRect(x, y, barWidth - 2, barHeight);
+          const y = audioCanvas.height - h;
+          audioCtxCanvas.fillStyle = `hsl(${i * 12}, 100%, 50%)`;
+          audioCtxCanvas.fillRect(x, y, barWidth - 2, h);
         });
       }
-
-      draw();
+      playPauseBtn.addEventListener("click", () => {
+        if (!audioCtxStarted) {
+          ctx.resume().then(draw);
+          audioCtxStarted = true;
+        }
+      });
     }
-  </script>
-</body>
+  </script></body>
 </html>
