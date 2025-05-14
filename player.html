@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Медиаплеер</title>
+  <style>
+    body {
+      background: #121212;
+      color: white;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .player-container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #logo {
+      max-width: 100px;
+      height: auto;
+    }
+
+    h1 {
+      font-size: clamp(18px, 5vw, 24px);
+      margin: 0;
+      text-align: center;
+    }
+
+    .badge {
+      font-size: 12px;
+      color: #ccc;
+    }
+
+    video, audio {
+      width: 100%;
+      max-height: 60vh;
+      border-radius: 10px;
+      background: black;
+      outline: none;
+    }
+
+    .controls {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .controls button,
+    .controls input[type="range"] {
+      background: #333;
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .controls .time {
+      font-size: 13px;
+      min-width: 42px;
+      text-align: center;
+    }
+
+    .controls input[type="range"] {
+      flex: 1 1 100px;
+      height: 6px;
+      appearance: none;
+    }
+
+    .back-btn {
+      background: #444;
+      align-self: flex-start;
+    }
+
+    .buffering {
+      font-size: 14px;
+      color: #ffaa00;
+      display: none;
+    }
+
+    #speed.green  { color: #44ff44; }
+    #speed.yellow { color: #ffaa00; }
+    #speed.red    { color: #ff5555; }
+
+    #speedChart,
+    #audioViz {
+      width: 100%;
+      max-width: 100%;
+      border-radius: 5px;
+      border: 1px solid #444;
+      background: #1a1a1a;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="player-container">
+    <button class="back-btn" onclick="location.href='index.html'">⏴ Назад к плейлисту</button>
+    <img id="logo" hidden />
+    <h1 id="channelName">Загрузка...</h1>
+    <div class="badge" id="qualityBadge"></div>
+
+    <div id="media-container"></div>
+    <div class="buffering" id="buffering">Буферизация...</div>
+
+    <div class="controls">
+      <button id="playPause">▶</button>
+      <span class="time" id="currentTime">0:00</span>
+      <input type="range" id="progress" value="0" min="0" step="0.01">
+      <span class="time" id="duration">0:00</span>
+      <input type="range" id="volume" value="1" min="0" max="1" step="0.01">
+      <button id="fullscreen">⛶</button>
+    </div>
+
+    <div id="bufferStatus">
+      <div id="speed" class="buffering">Скорость загрузки: —</div>
+      <canvas id="speedChart" width="700" height="50"></canvas>
+      <canvas id="audioViz" width="700" height="60"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const url = params.get("url");
+    const name = params.get("name") || "Канал";
+    const logo = params.get("logo");
+
+    const mediaContainer = document.getElementById("media-container");
+    const playPauseBtn = document.getElementById("playPause");
+    const currentTimeEl = document.getElementById("currentTime");
+    const durationEl = document.getElementById("duration");
+    const progressBar = document.getElementById("progress");
+    const volumeBar = document.getElementById("volume");
+    const logoEl = document.getElementById("logo");
+    const nameEl = document.getElementById("channelName");
+    const buffering = document.getElementById("buffering");
+    const fullscreenBtn = document.getElementById("fullscreen");
+    const qualityBadge = document.getElementById("qualityBadge");
+    const speedEl = document.getElementById("speed");
+    const speedChart = document.getElementById("speedChart");
+    const speedCtx = speedChart.getContext("2d");
+    const audioCanvas = document.getElementById("audioViz");
+    const audioCtx = audioCanvas.getContext("2d");
+
+    nameEl.textContent = name;
+    if (logo && logo.startsWith("http")) {
+      logoEl.src = logo;
+      logoEl.hidden = false;
+    }
+
+    const audioExt = /\.(mp3|aac|ogg|m4a)$/i;
+    const isVideo = !audioExt.test(url);
+    const media = document.createElement(isVideo ? "video" : "audio");
+    media.src = url;
+    media.controls = false;
+    media.autoplay = true;
+    mediaContainer.appendChild(media);
+
+    const quality = /1080|720|hd/i.test(url)
+      ? "HD"
+      : /480|360|sd/i.test(url)
+      ? "SD"
+      : "";
+    qualityBadge.textContent = quality ? `Качество: ${quality}` : "";
+
+    playPauseBtn.onclick = () => {
+      if (media.paused) {
+        media.play();
+        playPauseBtn.textContent = "⏸";
+      } else {
+        media.pause();
+        playPauseBtn.textContent = "▶";
+      }
+    };
+
+    media.addEventListener("timeupdate", () => {
+      progressBar.value = media.currentTime;
+      currentTimeEl.textContent = formatTime(media.currentTime);
+    });
+
+    media.addEventListener("loadedmetadata", () => {
+      progressBar.max = media.duration;
+      durationEl.textContent = formatTime(media.duration);
+    });
+
+    progressBar.addEventListener("input", () => {
+      media.currentTime = progressBar.value;
+    });
+
+    volumeBar.addEventListener("input", () => {
+      media.volume = volumeBar.value;
+    });
+
+    fullscreenBtn.onclick = () => {
+      if (media.requestFullscreen) media.requestFullscreen();
+      else if (media.webkitRequestFullscreen) media.webkitRequestFullscreen();
+      else if (media.msRequestFullscreen) media.msRequestFullscreen();
+    };
+
+    media.addEventListener("waiting", () => buffering.style.display = "block");
+    media.addEventListener("playing", () => buffering.style.display = "none");
+    media.addEventListener("canplay", () => buffering.style.display = "none");
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s.toString().padStart(2, "0")}`;
+    }
+
+    // График буферизации
+    if (isVideo) {
+      let lastLoaded = 0;
+      let lastTime = performance.now();
+      const history = [];
+      const maxPoints = 100;
+
+      setInterval(() => {
+        const buffered = media.buffered;
+        if (buffered.length === 0) return;
+
+        const end = buffered.end(buffered.length - 1);
+        const now = performance.now();
+        const duration = (now - lastTime) / 1000;
+
+        const delta = end - lastLoaded;
+        lastLoaded = end;
+        lastTime = now;
+
+        const bitrate = Math.max(0, Math.round((delta * media.videoWidth * media.videoHeight * 0.07) / duration));
+        history.push(bitrate);
+        if (history.length > maxPoints) history.shift();
+
+        speedEl.textContent = `Скорость загрузки: ${bitrate} кбит/с`;
+        speedEl.className = "buffering";
+        if (bitrate > 1500) speedEl.classList.add("green");
+        else if (bitrate > 800) speedEl.classList.add("yellow");
+        else speedEl.classList.add("red");
+
+        speedCtx.clearRect(0, 0, speedChart.width, speedChart.height);
+        speedCtx.beginPath();
+        speedCtx.moveTo(0, speedChart.height);
+        history.forEach((v, i) => {
+          const x = (i / maxPoints) * speedChart.width;
+          const y = speedChart.height - (v / 3000) * speedChart.height;
+          speedCtx.lineTo(x, y);
+        });
+        speedCtx.strokeStyle = "#00ffff";
+        speedCtx.lineWidth = 2;
+        speedCtx.stroke();
+      }, 2000);
+    }
+
+    // Визуализация аудио
+    if (!isVideo) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = ctx.createMediaElementSource(media);
+      const analyser = ctx.createAnalyser();
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      analyser.fftSize = 64;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function draw() {
+        requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+
+        audioCtx.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
+        const barWidth = audioCanvas.width / bufferLength;
+        dataArray.forEach((v, i) => {
+          const barHeight = (v / 255) * audioCanvas.height;
+          const x = i * barWidth;
+          const y = audioCanvas.height - barHeight;
+          audioCtx.fillStyle = `hsl(${i * 12}, 100%, 50%)`;
+          audioCtx.fillRect(x, y, barWidth - 2, barHeight);
+        });
+      }
+
+      draw();
+    }
+  </script>
+</body>
+</html>
