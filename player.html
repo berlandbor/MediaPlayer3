@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="ru">
+<!DOCTYPE html>
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,6 +14,7 @@
       display: flex;
       justify-content: center;
     }
+
     .player-container {
       width: 100%;
       max-width: 900px;
@@ -23,19 +25,23 @@
       padding: 10px;
       box-sizing: border-box;
     }
+
     #logo {
       max-width: 100px;
       height: auto;
     }
+
     h1 {
       font-size: clamp(18px, 5vw, 24px);
       margin: 0;
       text-align: center;
     }
+
     .badge {
       font-size: 12px;
       color: #ccc;
     }
+
     video, audio {
       width: 100%;
       max-height: 60vh;
@@ -43,6 +49,7 @@
       background: black;
       outline: none;
     }
+
     .controls, .nav-controls {
       width: 100%;
       display: flex;
@@ -51,6 +58,7 @@
       align-items: center;
       justify-content: center;
     }
+
     button, input[type="range"] {
       background: #333;
       border: none;
@@ -59,28 +67,33 @@
       border-radius: 4px;
       cursor: pointer;
     }
+
     .time {
       font-size: 13px;
       min-width: 42px;
       text-align: center;
     }
+
     input[type="range"] {
       flex: 1 1 100px;
       height: 6px;
       appearance: none;
     }
+
     .back-btn {
       background: #444;
       align-self: flex-start;
     }
+
     .buffering {
       font-size: 14px;
       color: #ffaa00;
-      display: none;
     }
-    #speed.green { color: #44ff44; }
+
+    #speed.green  { color: #44ff44; }
     #speed.yellow { color: #ffaa00; }
-    #speed.red { color: #ff5555; }
+    #speed.red    { color: #ff5555; }
+
     #speedChart, #audioViz {
       width: 100%;
       max-width: 100%;
@@ -97,8 +110,11 @@
     <img id="logo" hidden />
     <h1 id="channelName">Загрузка...</h1>
     <div class="badge" id="qualityBadge"></div>
+
     <div id="media-container"></div>
-    <div class="buffering" id="buffering">Буферизация...</div>
+    <div id="buffering" class="buffering">Буферизация...</div>
+    <div id="statusText" class="buffering" style="color: #ccc;">Ожидание потока...</div>
+
     <div class="controls">
       <button id="playPause">▶</button>
       <span class="time" id="currentTime">0:00</span>
@@ -107,16 +123,20 @@
       <input type="range" id="volume" value="1" min="0" max="1" step="0.01">
       <button id="fullscreen">⛶</button>
     </div>
+
     <div class="nav-controls">
       <button onclick="changeChannel(-1)">◀ Предыдущий</button>
       <button onclick="changeChannel(1)">Следующий ▶</button>
     </div>
+
     <div id="bufferStatus">
       <div id="speed" class="buffering">Скорость загрузки: —</div>
       <canvas id="speedChart" width="700" height="50"></canvas>
       <canvas id="audioViz" width="700" height="60"></canvas>
     </div>
-  </div>  <script>
+  </div>
+
+  <script>
     const params = new URLSearchParams(location.search);
     const url = params.get("url");
     const name = params.get("name") || "Канал";
@@ -127,37 +147,33 @@
     const audioExt = /\.(mp3|aac|ogg|m4a)$/i;
     const isVideo = !audioExt.test(url);
 
-    const mediaContainer = document.getElementById("media-container");
-    const playPauseBtn = document.getElementById("playPause");
-    const currentTimeEl = document.getElementById("currentTime");
-    const durationEl = document.getElementById("duration");
-    const progressBar = document.getElementById("progress");
-    const volumeBar = document.getElementById("volume");
-    const logoEl = document.getElementById("logo");
-    const nameEl = document.getElementById("channelName");
     const buffering = document.getElementById("buffering");
-    const fullscreenBtn = document.getElementById("fullscreen");
-    const qualityBadge = document.getElementById("qualityBadge");
+    const statusText = document.getElementById("statusText");
     const speedEl = document.getElementById("speed");
     const speedCtx = document.getElementById("speedChart").getContext("2d");
     const audioCtxCanvas = document.getElementById("audioViz").getContext("2d");
-
-    nameEl.textContent = name;
-    if (logo && logo.startsWith("http")) {
-      logoEl.src = logo;
-      logoEl.hidden = false;
-    }
 
     const media = document.createElement(isVideo ? "video" : "audio");
     media.src = url;
     media.controls = false;
     media.autoplay = true;
-    mediaContainer.appendChild(media);
+    document.getElementById("media-container").appendChild(media);
 
-    const quality = /1080|720|hd/i.test(url) ? "HD" : /480|360|sd/i.test(url) ? "SD" : "";
-    qualityBadge.textContent = quality ? `Качество: ${quality}` : "";
+    document.getElementById("channelName").textContent = name;
+    if (logo && logo.startsWith("http")) {
+      const logoEl = document.getElementById("logo");
+      logoEl.src = logo;
+      logoEl.hidden = false;
+    }
 
-    playPauseBtn.onclick = () => {
+    const quality = /1080|720|hd/i.test(url)
+      ? "HD"
+      : /480|360|sd/i.test(url)
+      ? "SD"
+      : "";
+    document.getElementById("qualityBadge").textContent = quality ? `Качество: ${quality}` : "";
+
+    document.getElementById("playPause").onclick = () => {
       if (media.paused) {
         media.play();
         playPauseBtn.textContent = "⏸";
@@ -166,6 +182,12 @@
         playPauseBtn.textContent = "▶";
       }
     };
+
+    const playPauseBtn = document.getElementById("playPause");
+    const currentTimeEl = document.getElementById("currentTime");
+    const durationEl = document.getElementById("duration");
+    const progressBar = document.getElementById("progress");
+    const volumeBar = document.getElementById("volume");
 
     media.addEventListener("timeupdate", () => {
       progressBar.value = media.currentTime;
@@ -185,15 +207,45 @@
       media.volume = volumeBar.value;
     });
 
-    fullscreenBtn.onclick = () => {
+    document.getElementById("fullscreen").onclick = () => {
       if (media.requestFullscreen) media.requestFullscreen();
       else if (media.webkitRequestFullscreen) media.webkitRequestFullscreen();
       else if (media.msRequestFullscreen) media.msRequestFullscreen();
     };
 
-    media.addEventListener("waiting", () => buffering.style.display = "block");
-    media.addEventListener("playing", () => buffering.style.display = "none");
-    media.addEventListener("canplay", () => buffering.style.display = "none");
+    media.addEventListener("waiting", () => {
+      buffering.style.display = "block";
+      statusText.textContent = "Буферизация...";
+      statusText.style.color = "#ffaa00";
+    });
+
+    media.addEventListener("canplay", () => {
+      buffering.style.display = "none";
+      statusText.textContent = "Поток готов";
+      statusText.style.color = "#00ffcc";
+      clearTimeout(streamTimeout);
+    });
+
+    media.addEventListener("playing", () => {
+      buffering.style.display = "none";
+      statusText.textContent = "Воспроизведение...";
+      statusText.style.color = "#44ff44";
+      clearTimeout(streamTimeout);
+    });
+
+    media.addEventListener("error", () => {
+      buffering.style.display = "none";
+      statusText.textContent = "Ошибка: поток не загружается";
+      statusText.style.color = "#ff4444";
+    });
+
+    let streamTimeout = setTimeout(() => {
+      if (!media.paused && !media.ended && media.readyState < 3) {
+        buffering.style.display = "none";
+        statusText.textContent = "Поток не отвечает (возможно, нерабочий)";
+        statusText.style.color = "#ff4444";
+      }
+    }, 10000);
 
     function formatTime(sec) {
       const m = Math.floor(sec / 60);
@@ -226,16 +278,16 @@
         if (history.length > maxPoints) history.shift();
         speedEl.textContent = `Скорость загрузки: ${bitrate} кбит/с`;
         speedEl.className = "buffering";
-        if (bitrate > 1500) speedEl.classList.add("green");
-        else if (bitrate > 800) speedEl.classList.add("yellow");
-        else speedEl.classList.add("red");
+        speedEl.classList.add(
+          bitrate > 1500 ? "green" :
+          bitrate > 800 ? "yellow" : "red"
+        );
         speedCtx.clearRect(0, 0, speedChart.width, speedChart.height);
         speedCtx.beginPath();
         history.forEach((v, i) => {
           const x = (i / maxPoints) * speedChart.width;
           const y = speedChart.height - (v / 3000) * speedChart.height;
-          if (i === 0) speedCtx.moveTo(x, y);
-          else speedCtx.lineTo(x, y);
+          i === 0 ? speedCtx.moveTo(x, y) : speedCtx.lineTo(x, y);
         });
         speedCtx.strokeStyle = "#00ffff";
         speedCtx.lineWidth = 2;
@@ -250,26 +302,27 @@
       analyser.fftSize = 64;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
-      let audioCtxStarted = false;
+      let started = false;
       function draw() {
         requestAnimationFrame(draw);
         analyser.getByteFrequencyData(dataArray);
-        audioCtxCanvas.clearRect(0, 0, audioCanvas.width, audioCanvas.height);
-        const barWidth = audioCanvas.width / bufferLength;
+        audioCtxCanvas.clearRect(0, 0, audioViz.width, audioViz.height);
+        const barWidth = audioViz.width / bufferLength;
         dataArray.forEach((v, i) => {
-          const h = (v / 255) * audioCanvas.height;
+          const h = (v / 255) * audioViz.height;
           const x = i * barWidth;
-          const y = audioCanvas.height - h;
+          const y = audioViz.height - h;
           audioCtxCanvas.fillStyle = `hsl(${i * 12}, 100%, 50%)`;
           audioCtxCanvas.fillRect(x, y, barWidth - 2, h);
         });
       }
       playPauseBtn.addEventListener("click", () => {
-        if (!audioCtxStarted) {
+        if (!started) {
           ctx.resume().then(draw);
-          audioCtxStarted = true;
+          started = true;
         }
       });
     }
-  </script></body>
+  </script>
+</body>
 </html>
