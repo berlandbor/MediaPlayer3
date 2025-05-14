@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Встроенный плеер</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    video, audio {
+      width: 100%;
+      max-width: 800px;
+      background: #fff;
+      border-radius: 10px;
+      outline: none;
+    }
+    .fallback-info {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="fallback-info">
+    <h2>Резервный встроенный плеер</h2>
+    <p>Если звук не воспроизводится в основном плеере — поток открыт через встроенные средства браузера.</p>
+  </div>
+
+  <div id="fallback-player">
+    <!-- Элемент будет вставлен ниже -->
+  </div>
+
+  <script>
+    const url = new URLSearchParams(location.search).get('url');
+    const container = document.getElementById('fallback-player');
+
+    if (url) {
+      const isAudio = /\.(mp3|aac|m4a|ogg)$/i.test(url);
+      container.innerHTML = `
+        <${isAudio ? 'audio' : 'video'} src="${url}" controls autoplay></${isAudio ? 'audio' : 'video'}>
+      `;
+    } else {
+      container.innerHTML = "<p style='color:#f55'>Ошибка: ссылка на поток не указана</p>";
+    }
+  </script>
+
+</body>
+</html>
